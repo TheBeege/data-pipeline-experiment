@@ -1,0 +1,34 @@
+version: "3.9"
+
+volumes:
+  database_storage:
+
+services:
+  collector:
+    build:
+      context: flows/.
+    env_file:
+      - flows/.env
+
+  notebook:
+    image: jupyter/datascience-notebook
+    volumes:
+      - type: bind
+        source: ./notebooks
+        target: /home/jovyan/work
+    ports:
+      - target: 8888
+        published: 10000
+
+  database:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: testdb
+      MYSQL_DATABASE: twitter
+    volumes:
+      - type: volume
+        source: database_storage
+        target: /var/lib/mysql
+      - type: bind
+        source: ./database/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
