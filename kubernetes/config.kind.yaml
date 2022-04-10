@@ -5,3 +5,16 @@ nodes:
     extraMounts:
       - hostPath: ./notebooks
         containerPath: /notebooks
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 8000
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 8443
+        protocol: TCP

@@ -14,11 +14,11 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add nginx-stable https://helm.nginx.com/stable
 
 #######################################
-# LOAD BALANCER AND INGRESS CONTROLLER #
+######### INGRESS CONTROLLER ##########
 #######################################
-helm upgrade --namespace metallb-system --install metallb bitnami/metallb
-kubectl apply -n metallb-system -f kubernetes/config.metallb.yaml
-helm install nginx-controller nginx-stable/nginx-ingress
+# https://kind.sigs.k8s.io/docs/user/ingress/#ingress-nginx
+# The manifests contains kind specific patches to forward the hostPorts to the ingress controller, set taint tolerations and schedule it to the custom labelled node.
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
 #######################################
 ############## DATABASE ###############
@@ -36,3 +36,4 @@ helm upgrade --cleanup-on-fail \
   --install jupyterhub jupyterhub/jupyterhub \
   --namespace data-pipeline \
   --values kubernetes/values.jupyterhub.yaml
+# default login -- admin / admin

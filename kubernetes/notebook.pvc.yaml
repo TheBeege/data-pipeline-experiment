@@ -4,13 +4,13 @@ kind: PersistentVolume
 metadata:
   name: pv-notebook
 spec:
-  storageClassName: standard
+  storageClassName: ''
   accessModes:
     - ReadWriteOnce
   capacity:
     storage: 10Gi
   hostPath:
-    path: ./notebooks
+    path: /notebooks  # should match extraMounts.containerPath in kind config
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -20,6 +20,7 @@ spec:
   volumeName: pv-notebook
   accessModes:
     - ReadWriteOnce
+  storageClassName: ''
   resources:
     requests:
       storage: 10Gi

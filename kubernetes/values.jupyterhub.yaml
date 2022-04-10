@@ -3,4 +3,6 @@ singleuser:
     type: static
     static:
       pvcName: pvc-notebook
-      subPath: work
+
+ingress:
+  enabled: true
