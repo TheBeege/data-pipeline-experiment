@@ -4,5 +4,14 @@ singleuser:
     static:
       pvcName: pvc-notebook
 
+hub:
+  baseUrl: /jupyterhub
+
 ingress:
   enabled: true
+  hosts:
+    - localhost
+
+proxy:
+  service:
+    type: ClusterIP

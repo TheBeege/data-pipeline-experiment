@@ -1,4 +1,5 @@
 .local
+.jupyter
 # Created by https://www.toptal.com/developers/gitignore/api/linux,jetbrains+all,python,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,jetbrains+all,python,jupyternotebooks
 
