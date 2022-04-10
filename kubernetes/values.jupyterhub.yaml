@@ -1,0 +1,6 @@
+singleuser:
+  storage:
+    type: static
+    static:
+      pvcName: pvc-notebook
+      subPath: work

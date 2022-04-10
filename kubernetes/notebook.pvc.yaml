@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-notebook
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  hostPath:
+    path: ./notebooks
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-notebook
+spec:
+  volumeName: pv-notebook
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
