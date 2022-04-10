@@ -1,0 +1,43 @@
+uiVersionTag: latest
+
+jobs:
+  createTenant:
+    enabled: true
+    image:
+      tag: latest
+
+agent:
+  enabled: true
+  image:
+    tag: latest
+
+postgresql:
+  persistence:
+    enabled: true
+  postgresqlPassword: prefectdbtest
+
+apollo:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - localhost
+    path: /apollo
+  service:
+    type: ClusterIP
+
+ui:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - localhost
+#    path: /prefect-ui
+  apolloApiUrl: http://localhost:8000/apollo/graphql
+  service:
+    type: ClusterIP
+#  env:
+#    - name: PREFECT_SERVER__BASE_URL
+#      value: /prefect-ui
+# https://github.com/PrefectHQ/ui/pull/450
+# https://github.com/PrefectHQ/ui/issues/861
