@@ -4,6 +4,7 @@ import prefect
 from prefect import task, Flow
 import requests
 import mysql.connector
+from prefect.storage import Docker
 
 
 @task(log_stdout=True)
@@ -54,10 +55,10 @@ def store_data(records):
     connection.commit()
 
 
-with Flow("Twitter data") as flow:
+with Flow(name="Twitter data") as flow:
     tweets = retrieve_tweets()
     formatted_data = transform_data(tweets)
     store_data(formatted_data)
 
-
-flow.run()
+if __name__ == '__main__':
+    flow.run()
