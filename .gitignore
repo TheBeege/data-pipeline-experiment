@@ -1,3 +1,4 @@
+.env
 .local
 .jupyter
 # Created by https://www.toptal.com/developers/gitignore/api/linux,jetbrains+all,python,jupyternotebooks
