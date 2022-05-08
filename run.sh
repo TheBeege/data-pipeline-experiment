@@ -2,24 +2,49 @@
 
 set -e
 
-# Set up docker daemon file to support the registry we'll set up
-echo 'You MUST set {"insecure-registries": ["registry-docker-registry:5000"]} in your Docker Desktop engine configuration'
-echo 'You must also add 127.0.0.1 registry-docker-registry to your /etc/hosts file on the host OS'
-read -p "Press enter to continue"
+#######################################
+############ LOCAL REGISTRY ###########
+#######################################
+# Thanks to https://kind.sigs.k8s.io/docs/user/local-registry/
+# create registry container unless it already exists
+# These two vars' values are also set in config.kind.yaml
+#   and registry.configmap.yaml
+reg_name='kind-registry'
+reg_port='5001'
+if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
+  docker run \
+    -d --restart=always -p "127.0.0.1:${reg_port}:5000" --name "${reg_name}" \
+    registry:2
+fi
 
-#if [[ ! -f "/etc/docker/daemon.json" ]]
-#then
-#  echo '{"insecure-registries": ["registry-docker-registry:5000"]}' | jq -M | sudo tee /etc/docker/daemon.json > /dev/null
-#elif [ "$(jq '.["insecure-registries"] | index ("registry-docker-registry:5000")' /etc/docker/daemon.json)" != 0 ]
-#then
-#  cat /etc/docker/daemon.json | jq -M '.["insecure-registries"] += ["registry-docker-registry:5000"]' | sudo tee /etc/docker/daemon.json > /dev/null
-#fi
+#######################################
+############ SET UP CLUSTER ###########
+#######################################
+if [[ "$(kind get clusters)" != *"data-pipeline"* ]]
+then
+  kind create cluster --name data-pipeline --config kubernetes/config.kind.yaml
+fi
 
-# Install kind separately
-kind create cluster --name data-pipeline --config kubernetes/config.kind.yaml
+# connect the registry to the cluster network if not already connected
+if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
+  docker network connect "kind" "${reg_name}"
+fi
 
-kubectl create namespace data-pipeline
-kubectl apply -n data-pipeline -f kubernetes/notebook.pvc.yaml
+if [[ -z "$(kubectl get namespaces data-pipeline --ignore-not-found | tail -n 1)" ]]
+then
+  kubectl create namespace data-pipeline
+fi
+
+# Just docs, but good idea
+if [[ -z "$(kubectl get configmap local-registry-hosting -n data-pipeline --ignore-not-found)" ]]
+then
+  kubectl apply -f kubernetes/registry.configmap.yaml
+fi
+
+if [[ -z "$(kubectl get pvc pvc-notebook --ignore-not-found -n data-pipeline)" ]]
+then
+  kubectl apply -n data-pipeline -f kubernetes/notebook.pvc.yaml
+fi
 
 #######################################
 ########## HELM REPOSITORIES ##########
@@ -30,18 +55,26 @@ helm repo add nginx-stable https://helm.nginx.com/stable
 #######################################
 ######### INGRESS CONTROLLER ##########
 #######################################
-# https://kind.sigs.k8s.io/docs/user/ingress/#ingress-nginx
-# The manifests contains kind specific patches to forward the hostPorts to the ingress controller, set taint tolerations and schedule it to the custom labelled node.
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
+if [[ -z "$(kubectl get deployments ingress-nginx-controller --ignore-not-found -n ingress-nginx)" ]]
+then
+  # https://kind.sigs.k8s.io/docs/user/ingress/#ingress-nginx
+  # The manifests contains kind specific patches to forward the hostPorts to the ingress controller, set taint tolerations and schedule it to the custom labelled node.
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+  kubectl annotate ingressclass nginx ingressclass.kubernetes.io/is-default-class=true
+  sleep 2
+  kubectl wait --namespace ingress-nginx \
+    --for=condition=ready pod \
+    --selector=app.kubernetes.io/component=controller \
+    --timeout=120s
+fi
 
 #######################################
 ############## DATABASE ###############
 #######################################
+if [[ -z "$(kubectl get configmap mariadb-init-scripts -n data-pipeline --ignore-not-found)" ]]
+then
+  kubectl apply -f kubernetes/initScriptsConfigmap.mariadb.yaml
+fi
 helm upgrade --cleanup-on-fail \
   --install database bitnami/mariadb \
   --namespace data-pipeline \
@@ -69,23 +102,17 @@ helm upgrade --cleanup-on-fail \
 # default login -- admin / admin
 
 #######################################
-########### DOCKER REGISTRY ###########
-#######################################
-helm repo add twuni https://helm.twun.io
-helm upgrade --cleanup-on-fail \
-  --install registry twuni/docker-registry \
-  --namespace data-pipeline \
-  --set service.type=NodePort \
-  --set service.nodePort=30500
-
-#######################################
 ############ PREFECT FLOWS ############
 #######################################
 # should have a hosts file entry where registry-docker-registry is localhost
 prefect backend server
-PREFECT__SERVER__ENDPOINT=http://localhost:8000/apollo prefect create project twitter-pipeline
-docker build -t 127.0.0.1:30500/twitter-data-science:latest flows/
-kubectl port-forward -n data-pipeline service/registry-docker-registry 30500:5000 > /dev/null 2>&1 &
-docker push 127.0.0.1:30500/twitter-data-science:latest
-kill $(jobs -l | grep "kubectl port-forward" | awk '{print $2}')
-PREFECT__SERVER__ENDPOINT=http://localhost:8000/apollo python flows/register_flow.py
+kubectl wait --namespace data-pipeline \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=apollo \
+  --timeout=120s
+export PREFECT__SERVER__ENDPOINT=http://localhost:8000/apollo
+if [[ "$(prefect get projects --name twitter-pipeline | tail -n 1)" != "twitter-pipeline"* ]]
+then
+  prefect create project twitter-pipeline
+fi
+source .env && python flows/register_flow.py

@@ -2,3 +2,4 @@
 auth:
   database: twitter
   rootPassword: testdb
+initdbScriptsConfigMap: mariadb-init-scripts

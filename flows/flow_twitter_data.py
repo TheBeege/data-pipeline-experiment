@@ -4,7 +4,7 @@ import prefect
 from prefect import task, Flow
 import requests
 import mysql.connector
-from prefect.storage import Docker
+from prefect.run_configs import KubernetesRun
 
 
 @task(log_stdout=True)
@@ -41,7 +41,7 @@ def store_data(records):
     logger = prefect.context.get("logger")
     logger.info('connecting to database')
     connection = mysql.connector.connect(
-        host="database",
+        host="database-mariadb",
         user="root",
         password="testdb",
         database="twitter"
@@ -55,7 +55,13 @@ def store_data(records):
     connection.commit()
 
 
-with Flow(name="Twitter data") as flow:
+with Flow(
+        name="Twitter data",
+        run_config=KubernetesRun(
+            env={'TWITTER_BEARER_TOKEN': os.getenv('TWITTER_BEARER_TOKEN')},
+            image_pull_policy='Always',
+        ),
+) as flow:
     tweets = retrieve_tweets()
     formatted_data = transform_data(tweets)
     store_data(formatted_data)

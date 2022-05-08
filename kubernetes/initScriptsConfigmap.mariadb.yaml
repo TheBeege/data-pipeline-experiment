@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-init-scripts
+  namespace: data-pipeline
+data:
+  init.sql: |
+    create table tweets (
+        id bigint auto_increment primary key,
+        text text
+    );
